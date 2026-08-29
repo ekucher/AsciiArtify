@@ -10,7 +10,8 @@ Argo CD — declarative GitOps continuous delivery tool for Kubernetes. У ме�
 - встановлення Argo CD в окремий namespace `argocd`;
 - готовність усіх основних компонентів Argo CD;
 - отримання initial admin credentials без збереження пароля у Git;
-- локальний доступ команди до Argo CD Web UI через `kubectl port-forward`.
+- локальний доступ команди до Argo CD Web UI через `kubectl port-forward`;
+- доступ до Web UI з Windows, коли Kubernetes/k3d запущені всередині WSL2.
 
 > Для PoC використовується стандартний non-HA manifest Argo CD. Він підходить для evaluation/demo/testing. Для production слід використовувати pinned version та HA-конфігурацію.
 
@@ -23,6 +24,7 @@ Argo CD — declarative GitOps continuous delivery tool for Kubernetes. У ме�
 - Docker-compatible container runtime;
 - `kubectl`;
 - `k3d`;
+- WSL2/Linux environment (для цього PoC використовувався Ubuntu у WSL2);
 - доступ до GitHub/Internet для завантаження Argo CD manifests та container images.
 
 Перевірка:
@@ -38,7 +40,17 @@ k3d version
 - Docker 29.x;
 - kubectl v1.36.1;
 - k3d v5.9.0;
-- k3s v1.35.5-k3s1.
+- k3s v1.35.5-k3s1;
+- Argo CD v3.5.2.
+
+Версію Argo CD можна перевірити так:
+
+```bash
+kubectl get deployment argocd-server \
+  -n argocd \
+  -o jsonpath='{.spec.template.spec.containers[0].image}'
+echo
+```
 
 ---
 
@@ -78,10 +90,12 @@ k3d-asciiartify-agent-1    Ready
 
 ## 4. Встановлення Argo CD
 
-Створюємо окремий namespace:
+Створюємо namespace idempotent-командою, щоб повторний запуск не завершувався помилкою `AlreadyExists`:
 
 ```bash
-kubectl create namespace argocd
+kubectl create namespace argocd \
+  --dry-run=client \
+  -o yaml | kubectl apply -f -
 ```
 
 Встановлюємо Argo CD через офіційний stable manifest:
@@ -138,6 +152,12 @@ argocd-server                     1/1 Running
 argocd-server   ClusterIP   80/TCP,443/TCP
 ```
 
+Додаткова перевірка всіх ресурсів:
+
+```bash
+kubectl get all -n argocd
+```
+
 ---
 
 ## 6. Отримання initial admin password
@@ -161,7 +181,7 @@ echo
 
 > **Security:** реальний пароль не повинен зберігатися у Git, документації, shell scripts або demo-файлах.
 
-Після першого входу initial password рекомендується змінити.
+Після першого входу initial password рекомендується змінити. Для ephemeral PoC альтернативою є видалення всього k3d-кластера після завершення демонстрації.
 
 ---
 
@@ -169,23 +189,82 @@ echo
 
 За замовчуванням `argocd-server` має тип `ClusterIP`, тому для локального PoC зовнішня публікація сервісу не потрібна.
 
-Запускаємо port-forward:
+### 7.1. Звичайний локальний доступ
+
+Якщо `kubectl` працює безпосередньо на хості або WSL localhost forwarding працює коректно:
 
 ```bash
 kubectl port-forward svc/argocd-server -n argocd 8080:443
 ```
 
-Очікуваний результат:
-
-```text
-Forwarding from 127.0.0.1:8080 -> 8080
-Forwarding from [::1]:8080 -> 8080
-```
-
-Після цього відкриваємо у браузері:
+Після цього Web UI доступний за адресою:
 
 ```text
 https://localhost:8080
+```
+
+### 7.2. Доступ з Windows до Argo CD у WSL2
+
+У цьому PoC k3d/Kubernetes запущені всередині WSL2. Якщо Windows-браузер не може відкрити `https://localhost:8080`, port-forward потрібно прив'язати до всіх інтерфейсів WSL:
+
+```bash
+kubectl port-forward \
+  --address 0.0.0.0 \
+  svc/argocd-server \
+  -n argocd \
+  8080:443
+```
+
+Очікуваний результат:
+
+```text
+Forwarding from 0.0.0.0:8080 -> 8080
+```
+
+Перевірка всередині WSL:
+
+```bash
+curl -k https://127.0.0.1:8080/
+```
+
+Якщо повертається HTML-сторінка Argo CD, port-forward працює.
+
+Визначаємо IP WSL:
+
+```bash
+hostname -I
+```
+
+Потрібно використовувати першу WSL-адресу, наприклад:
+
+```text
+172.x.x.x
+```
+
+> WSL2 IP є динамічним і може змінитися після перезапуску WSL/Windows, тому його не слід жорстко записувати у скрипти або документацію.
+
+У Windows-браузері відкриваємо:
+
+```text
+https://<WSL-IP>:8080
+```
+
+Наприклад:
+
+```text
+https://172.x.x.x:8080
+```
+
+За потреби перевірити доступність порту з Windows PowerShell:
+
+```powershell
+Test-NetConnection <WSL-IP> -Port 8080
+```
+
+Очікується:
+
+```text
+TcpTestSucceeded : True
 ```
 
 Через self-signed TLS certificate браузер може показати попередження. Для локального PoC це очікувана поведінка.
@@ -212,28 +291,38 @@ k3d cluster create asciiartify --servers 1 --agents 2 --wait
 # 2. Verify Kubernetes
 kubectl get nodes
 
-# 3. Install Argo CD
-kubectl create namespace argocd
+# 3. Create namespace idempotently
+kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+
+# 4. Install Argo CD
 kubectl apply -n argocd --server-side --force-conflicts \
   -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-# 4. Wait until Argo CD is ready
+# 5. Wait until Argo CD is ready
 kubectl wait --for=condition=Ready pod --all -n argocd --timeout=300s
 kubectl get pods -n argocd
 
-# 5. Get initial admin password
+# 6. Get initial admin password
 kubectl -n argocd get secret argocd-initial-admin-secret \
   -o jsonpath='{.data.password}' | base64 -d
 echo
 
-# 6. Expose Web UI locally
-kubectl port-forward svc/argocd-server -n argocd 8080:443
+# 7. Expose Web UI from WSL2
+kubectl port-forward --address 0.0.0.0 \
+  svc/argocd-server -n argocd 8080:443
 ```
 
-Відкрити:
+У другому WSL terminal:
+
+```bash
+curl -k https://127.0.0.1:8080/
+hostname -I
+```
+
+Відкрити у Windows-браузері:
 
 ```text
-https://localhost:8080
+https://<WSL-IP>:8080
 ```
 
 Login:
@@ -242,7 +331,7 @@ Login:
 admin
 ```
 
-Password отримати командою з кроку 5.
+Password отримати командою з кроку 6.
 
 ---
 
@@ -254,30 +343,30 @@ Password отримати командою з кроку 5.
 - усі 3 Kubernetes nodes працюють у стані `Ready`;
 - Argo CD успішно встановлюється в namespace `argocd`;
 - усі 7 основних Argo CD pod-ів переходять у стан `Running/Ready`;
+- фактично протестована версія Argo CD — `v3.5.2`;
 - `argocd-server` доступний всередині кластера через `ClusterIP`;
-- локальний доступ до Web UI надається через `kubectl port-forward` без зміни типу Service;
+- `curl -k https://127.0.0.1:8080/` через port-forward успішно повертає HTML Argo CD Web UI;
+- для WSL2 документовано доступ із Windows через `--address 0.0.0.0` та динамічний WSL IP;
 - initial admin password отримується з Kubernetes Secret і не потребує збереження у Git.
 
-Таким чином, Argo CD готовий як GitOps-платформа для наступного етапу — реалізації MVP AsciiArtify та declarative deployment застосунку з Git repository.
+PoC підтверджує технічну можливість використовувати Argo CD як GitOps-систему для наступного етапу AsciiArtify — MVP.
 
 ---
 
 ## 10. Cleanup
 
-Після завершення локального PoC кластер можна повністю видалити:
+Після завершення PoC весь локальний кластер можна видалити:
 
 ```bash
 k3d cluster delete asciiartify
 ```
 
-Це видалить локальний Kubernetes cluster разом з Argo CD та initial credentials.
+Це видаляє ephemeral Kubernetes environment разом із Argo CD та initial credentials.
 
 ---
 
 ## 11. Джерела
 
 - Argo CD documentation: https://argo-cd.readthedocs.io/en/stable/
-- Getting Started: https://argo-cd.readthedocs.io/en/latest/getting_started/
-- Local Argo CD setup: https://argo-cd.readthedocs.io/en/stable/try_argo_cd_locally/
-- Installation options: https://argo-cd.readthedocs.io/en/stable/operator-manual/installation/
+- Argo CD Getting Started: https://argo-cd.readthedocs.io/en/stable/getting_started/
 - k3d documentation: https://k3d.io/

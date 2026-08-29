@@ -468,11 +468,25 @@ https://asciinema.org/a/XXXXXXXX
 
 ## 10. Вбудоване demo
 
-Після завантаження запису замінити `<CAST_ID>` на реальний ID:
+Практичне demo записано після успішної перевірки PoC-кластера.
 
-[![asciicast](https://asciinema.org/a/<CAST_ID>.svg)](https://asciinema.org/a/<CAST_ID>)
+[![asciicast](https://asciinema.org/a/f1aMW5yAV3ZdbfHt.svg)](https://asciinema.org/a/f1aMW5yAV3ZdbfHt)
 
-> Не залишати `<CAST_ID>` у фінальній версії `main` — для перевірки завдання має бути доступний реальний запис demo.
+Пряме посилання на запис: https://asciinema.org/a/f1aMW5yAV3ZdbfHt
+
+### Результат практичного тесту
+
+Під час практичного тестування підтверджено:
+
+- створення k3d-кластера з **1 server** та **2 agent** nodes;
+- усі **3 Kubernetes nodes** перейшли у стан `Ready`;
+- `kubectl` автоматично використовував context `k3d-asciiartify`;
+- Deployment `hello-world` успішно розгорнув **2 replicas**;
+- Service та Traefik Ingress створено успішно;
+- застосунок доступний через k3d load balancer на `http://localhost:8080/`;
+- HTTP-відповідь містила `Hello World from AsciiArtify!`.
+
+Це підтверджує, що k3d забезпечує швидкий і відтворюваний локальний multi-node Kubernetes environment, достатній для PoC AsciiArtify.
 
 ---
 

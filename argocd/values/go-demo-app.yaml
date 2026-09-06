@@ -27,5 +27,6 @@ nats:
     name: go-demo-nats
 
 api-gateway:
+  replicas: 0
   service:
     type: ClusterIP

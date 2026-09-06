@@ -6,7 +6,7 @@ app:
 
 front:
   version: 3.0.1
-  replicas: 1
+  replicas: 2
 
 api:
   replicas: 1

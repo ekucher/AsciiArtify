@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: go-demo-app
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/part-of: asciiartify
+    app.kubernetes.io/managed-by: argocd
+spec:
+  project: default
+
+  # The product Helm chart stays in the upstream repository. Environment
+  # values live in AsciiArtify so the team can demonstrate its own GitOps
+  # change without modifying the instructor's repository.
+  sources:
+    - repoURL: https://github.com/den-vasyliev/go-demo-app.git
+      targetRevision: main
+      path: helm
+      helm:
+        releaseName: go-demo
+        valueFiles:
+          - $values/argocd/values/go-demo-app.yaml
+    - repoURL: https://github.com/ekucher/AsciiArtify.git
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: go-demo
+
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

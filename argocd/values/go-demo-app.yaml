@@ -1,0 +1,31 @@
+# Environment-specific overrides for the upstream go-demo-app Helm chart.
+# Change front.replicas to 2, commit and push to demonstrate Argo CD auto-sync.
+
+app:
+  version: v4
+
+front:
+  version: 3.0.1
+  replicas: 1
+
+api:
+  replicas: 1
+
+ascii:
+  replicas: 1
+
+img:
+  replicas: 1
+
+data:
+  replicas: 1
+
+nats:
+  # The vendored NATS chart names the Service after the Helm release.
+  # The upstream application templates use this value for their NATS URL.
+  service:
+    name: go-demo-nats
+
+api-gateway:
+  service:
+    type: ClusterIP

@@ -352,7 +352,7 @@ kubectl logs <pod-name> -n go-demo --all-containers --tail=100
 kubectl get events -n go-demo --sort-by=.lastTimestamp
 ```
 
-Стани `ErrImagePull` або `ImagePullBackOff` означають, що потрібно перевірити доступ до container registry та існування image/tag в upstream chart.
+Стани `ErrImagePull` або `ImagePullBackOff` означають, що потрібно перевірити доступ до container registry та існування image/tag у Helm chart продуктового fork.
 
 ### Windows не відкриває WSL2 port-forward
 

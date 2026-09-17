@@ -11,11 +11,11 @@ metadata:
 spec:
   project: default
 
-  # The product Helm chart stays in the upstream repository. Environment
-  # values live in AsciiArtify so the team can demonstrate its own GitOps
-  # change without modifying the instructor's repository.
+  # The product Helm chart is read from the team's fork of the instructor's
+  # repository. Environment values live in AsciiArtify so the team can
+  # demonstrate its own GitOps changes without modifying upstream.
   sources:
-    - repoURL: https://github.com/den-vasyliev/go-demo-app.git
+    - repoURL: https://github.com/ekucher/go-demo-app.git
       targetRevision: main
       path: helm
       helm:

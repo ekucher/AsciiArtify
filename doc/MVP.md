@@ -10,7 +10,7 @@ Git commit -> GitHub -> Argo CD detects change -> automatic sync -> Kubernetes
 
 На попередніх етапах для AsciiArtify було обрано **k3d/k3s** і перевірено встановлення Argo CD. На етапі MVP додається декларативний ресурс Argo CD `Application`, який:
 
-- отримує Helm chart продукту з `den-vasyliev/go-demo-app`;
+- отримує Helm chart продукту з fork `ekucher/go-demo-app`, створеного з `den-vasyliev/go-demo-app`;
 - отримує параметри середовища з репозиторію `ekucher/AsciiArtify`;
 - розгортає продукт у namespace `go-demo`;
 - автоматично синхронізує зміни з Git;
@@ -36,10 +36,10 @@ Git commit -> GitHub -> Argo CD detects change -> automatic sync -> Kubernetes
 
 Argo CD Application використовує два Git-джерела:
 
-1. `https://github.com/den-vasyliev/go-demo-app.git`, каталог `helm` — upstream Helm chart продукту.
+1. `https://github.com/ekucher/go-demo-app.git`, каталог `helm` — fork продуктового репозиторію `den-vasyliev/go-demo-app`, який безпосередньо відстежує Argo CD.
 2. `https://github.com/ekucher/AsciiArtify.git`, файл `argocd/values/go-demo-app.yaml` — контрольовані командою параметри середовища.
 
-Такий поділ дозволяє не копіювати upstream chart і водночас виконувати власні контрольні коміти для демонстрації автоматичної синхронізації.
+Такий поділ залишає код і Helm chart продукту у fork репозиторії, а environment-specific values — у AsciiArtify. Це дозволяє виконувати GitOps-зміни без модифікації оригінального репозиторію викладача і водночас явно виконує вимогу завдання щодо fork продукту.
 
 Ціль розгортання:
 
@@ -329,11 +329,7 @@ kubectl scale deployment go-demo-front -n go-demo --replicas=3
 
 ### Відео MVP
 
-Після запису додати сюди клікабельне посилання:
-
-```text
-MVP demo: https://www.youtube.com/watch?v=Rhf5tb99fDs
-```
+[MVP demo — автоматична синхронізація Argo CD](https://www.youtube.com/watch?v=Rhf5tb99fDs)
 
 ---
 
@@ -385,18 +381,18 @@ kubectl annotate application go-demo-app \
 
 Ця команда оновлює інформацію про Git revision, але не виконує ручну синхронізацію.
 
-### Попередження Helm lint для upstream chart
+### Helm chart у fork продукту
 
-`go-demo-app` — legacy chart, який використовує `apiVersion: v1` і vendored subcharts без повного переліку dependencies у `Chart.yaml`. Тому локальна команда `helm lint` може показати попередження/помилки metadata, хоча `helm template` успішно генерує ресурси для Argo CD.
+Для MVP використовується fork `ekucher/go-demo-app`, у якому Helm chart підготовлено для розгортання через Argo CD. Саме цей fork є продуктовим Git-джерелом Application, а `argocd/values/go-demo-app.yaml` у AsciiArtify містить environment-specific overrides.
 
-У upstream `data-deploy.yaml` також залишився старий дубльований YAML-ключ `name`. Це технічний борг продуктового репозиторію, а не зміна AsciiArtify. Перед демонстрацією потрібно орієнтуватися на фактичний стан Application у Argo CD та Kubernetes events:
+Перед демонстрацією фактичний стан слід перевіряти через Argo CD та Kubernetes events:
 
 ```bash
 kubectl get application go-demo-app -n argocd
 kubectl get events -n go-demo --sort-by=.lastTimestamp
 ```
 
-Якщо upstream chart буде модернізовано, override-файл `argocd/values/go-demo-app.yaml` і Argo CD Application змінювати не потрібно.
+Оригінальний `den-vasyliev/go-demo-app` використовується як upstream для fork і не змінюється безпосередньо.
 
 ---
 
@@ -421,7 +417,7 @@ k3d cluster delete asciiartify
 Підготовлена GitOps-конфігурація MVP:
 
 - Argo CD Application декларативно зберігається у Git;
-- upstream Helm chart не дублюється у репозиторії AsciiArtify;
+- Helm chart продукту береться безпосередньо з fork `ekucher/go-demo-app`;
 - namespace `go-demo` створюється автоматично;
 - зміни Git автоматично застосовуються до Kubernetes;
 - `prune` видаляє ресурси, вилучені з Git;
@@ -442,5 +438,6 @@ https://github.com/ekucher/AsciiArtify
 - Argo CD Declarative Setup: https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/
 - Argo CD Multiple Sources: https://argo-cd.readthedocs.io/en/stable/user-guide/multiple_sources/
 - Argo CD Getting Started: https://argo-cd.readthedocs.io/en/stable/getting_started/
-- go-demo-app: https://github.com/den-vasyliev/go-demo-app
+- go-demo-app upstream: https://github.com/den-vasyliev/go-demo-app
+- go-demo-app fork used by Argo CD: https://github.com/ekucher/go-demo-app
 - k3d documentation: https://k3d.io/

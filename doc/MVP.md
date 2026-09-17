@@ -332,7 +332,7 @@ kubectl scale deployment go-demo-front -n go-demo --replicas=3
 Після запису додати сюди клікабельне посилання:
 
 ```text
-MVP demo: <URL відео>
+MVP demo: https://www.youtube.com/watch?v=Rhf5tb99fDs
 ```
 
 ---
